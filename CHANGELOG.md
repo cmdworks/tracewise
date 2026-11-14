@@ -2,6 +2,13 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **cli:** `tracewise hook --neutral`: the same hook answered as `{api, event, decision, reason, context}` instead of an agent's schema, for a program that nests Tracewise inside its own hook (AutoMemory)
+- **cli:** `tracewise companion [--json]`: the companion API version and features
+- **cli:** `lock list --json` also carries `agent`, `session` and `expires_in_s` (the record's own fields are unchanged)
+
 ## [0.3.0] - 2026-11-10
 
 ### Added

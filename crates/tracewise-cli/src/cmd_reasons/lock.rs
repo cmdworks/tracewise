@@ -35,7 +35,23 @@ fn lock_list(db: &Database, repo_paths: &RepoPaths, json: bool) {
         }
     }
     if json {
-        println!("{}", serde_json::to_string(&locks).unwrap_or_default());
+        // The stable shape other programs read (see docs: companion). The record's own fields stay; `agent`, `session` and `expires_in_s`
+        // are added so a reader does not have to unpick `holder` or parse a time.
+        let now = tracewise_core::clock::now();
+        let rows: Vec<serde_json::Value> = locks
+            .iter()
+            .map(|l| {
+                let mut v = serde_json::to_value(l).unwrap_or_default();
+                v["agent"] = serde_json::json!(l.holder.name.as_deref().unwrap_or(&l.holder.kind));
+                v["session"] = serde_json::json!(l.holder.session);
+                v["expires_in_s"] = chrono::DateTime::parse_from_rfc3339(&l.expires)
+                    .ok()
+                    .map(|e| serde_json::json!((e.with_timezone(&chrono::Utc) - now).num_seconds().max(0)))
+                    .unwrap_or(serde_json::Value::Null);
+                v
+            })
+            .collect();
+        println!("{}", serde_json::to_string(&rows).unwrap_or_default());
     } else {
         for lock in locks {
             let holder_name = lock.holder.name.as_deref().unwrap_or(&lock.holder.kind);

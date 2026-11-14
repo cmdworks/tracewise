@@ -3,6 +3,7 @@ pub mod antigravity;
 pub mod claude;
 pub mod events;
 pub mod helpers;
+pub mod neutral;
 
 use std::io::Read;
 use tracewise_core::db::Database;
@@ -37,13 +38,19 @@ pub struct HookContext<'a> {
     pub profile: tracewise_core::profile::ProfileConfig,
 }
 
-pub fn handle_hook(event: &str, from: Option<&str>, record: Option<&std::path::Path>) {
+pub fn handle_hook(event: &str, from: Option<&str>, record: Option<&std::path::Path>, neutral: bool) {
     let mut stdin_str = String::new();
     let _ = std::io::stdin().read_to_string(&mut stdin_str);
     if let Some(dir) = record {
         let _ = std::fs::create_dir_all(dir);
         let name = if event.is_empty() { "payload" } else { event };
         let _ = std::fs::write(dir.join(format!("{name}.json")), &stdin_str);
+    }
+
+    // For a caller that nests this hook: the same work, one neutral answer instead of an agent's schema.
+    if neutral {
+        println!("{}", serde_json::to_string(&neutral::handle(event, from, &stdin_str)).unwrap_or_default());
+        return;
     }
 
     if let Some(agent @ ("claude" | "codex" | "cursor" | "gemini")) = from {

@@ -39,8 +39,22 @@ pub use cli::*;
 use fast_shell::{fast_shell_begin, fast_shell_end, try_fast_shell};
 
 fn handle_early_commands(cli: &Cli) -> bool {
-    if let Some(Commands::Hook { ref event, ref from, ref record }) = cli.command {
-        hook::handle_hook(event, from.as_deref(), record.as_deref());
+    if let Some(Commands::Hook { ref event, ref from, ref record, neutral }) = cli.command {
+        hook::handle_hook(event, from.as_deref(), record.as_deref(), neutral);
+        return true;
+    }
+    if let Some(Commands::Companion) = cli.command {
+        let info = serde_json::json!({
+            "api": hook::neutral::API,
+            "name": "tracewise",
+            "version": env!("CARGO_PKG_VERSION"),
+            "features": ["neutral-hook", "locks", "lock-list-json", "notices"],
+        });
+        if cli.json {
+            println!("{info}");
+        } else {
+            println!("tracewise {} (companion api {})", env!("CARGO_PKG_VERSION"), hook::neutral::API);
+        }
         return true;
     }
 
@@ -300,7 +314,7 @@ fn dispatch_repo_command(json: bool, repo_paths: &RepoPaths, command: Commands) 
                 let _ = cmd_adapters::handle_agent_check(&file, &payload, json);
             }
         },
-        Commands::Hook { .. } | Commands::Proc { .. } | Commands::Strict { .. } => {
+        Commands::Hook { .. } | Commands::Companion | Commands::Proc { .. } | Commands::Strict { .. } => {
             unreachable!()
         }
     }

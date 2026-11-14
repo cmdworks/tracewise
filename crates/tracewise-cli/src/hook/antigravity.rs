@@ -1,8 +1,8 @@
 use super::helpers::AGY_EDIT_TOOLS;
 use super::{execute_hook, HookInput, HookOutput};
 
-pub fn handle_antigravity_hook(cli_event: &str, stdin_str: &str) {
-    let val: serde_json::Value = serde_json::from_str(stdin_str).unwrap_or_default();
+/// What an Antigravity payload stands for (see `claude::translate`).
+pub(super) fn translate(cli_event: &str, val: &serde_json::Value) -> Option<(&'static str, HookInput)> {
     let session = val.get("conversationId").and_then(|v| v.as_str()).unwrap_or("default").to_string();
     let cwd = val.pointer("/workspacePaths/0").and_then(|v| v.as_str()).map(String::from);
     let tool = val.pointer("/toolCall/name").and_then(|v| v.as_str()).unwrap_or("");
@@ -15,6 +15,23 @@ pub fn handle_antigravity_hook(cli_event: &str, stdin_str: &str) {
         command,
         cwd: cwd.clone(),
     };
+    let is_edit = AGY_EDIT_TOOLS.contains(&tool);
+    let edit_paths = || arg(&["TargetFile", "Path", "AbsolutePath", "FilePath", "File"]).into_iter().collect::<Vec<_>>();
+    match cli_event {
+        "PreToolUse" if is_edit => Some(("pre-edit", mk(edit_paths(), None))),
+        "PreToolUse" if tool == "run_command" => Some(("pre-command", mk(Vec::new(), arg(&["CommandLine"])))),
+        "PostToolUse" if is_edit => Some(("post-edit", mk(edit_paths(), None))),
+        "PostToolUse" if tool == "run_command" => Some(("post-command", mk(Vec::new(), arg(&["CommandLine"])))),
+        "Stop" => {
+            let ev = if val.get("fullyIdle").and_then(|v| v.as_bool()) == Some(true) { "session-end" } else { "stop" };
+            Some((ev, mk(Vec::new(), None)))
+        }
+        _ => None,
+    }
+}
+
+pub fn handle_antigravity_hook(cli_event: &str, stdin_str: &str) {
+    let val: serde_json::Value = serde_json::from_str(stdin_str).unwrap_or_default();
     let allow = || HookOutput { decision: "allow", reason: None, notice: None };
     let reply = |res: HookOutput| {
         if res.decision == "deny" {
@@ -23,28 +40,18 @@ pub fn handle_antigravity_hook(cli_event: &str, stdin_str: &str) {
             println!(r#"{{"decision":"allow"}}"#);
         }
     };
-    let is_edit = AGY_EDIT_TOOLS.contains(&tool);
-    let edit_paths = || arg(&["TargetFile", "Path", "AbsolutePath", "FilePath", "File"]).into_iter().collect::<Vec<_>>();
-    match cli_event {
-        "PreToolUse" if is_edit => reply(execute_hook("pre-edit", mk(edit_paths(), None)).unwrap_or_else(|_| allow())),
-        "PreToolUse" if tool == "run_command" => {
-            reply(execute_hook("pre-command", mk(Vec::new(), arg(&["CommandLine"]))).unwrap_or_else(|_| allow()))
-        }
-        "PostToolUse" if is_edit => {
-            let _ = execute_hook("post-edit", mk(edit_paths(), None));
+    match translate(cli_event, &val) {
+        Some((ev @ ("pre-edit" | "pre-command"), input)) => reply(execute_hook(ev, input).unwrap_or_else(|_| allow())),
+        Some((ev @ ("post-edit" | "post-command"), input)) => {
+            let _ = execute_hook(ev, input);
             println!("{{}}");
         }
-        "PostToolUse" if tool == "run_command" => {
-            let _ = execute_hook("post-command", mk(Vec::new(), arg(&["CommandLine"])));
-            println!("{{}}");
-        }
-        "Stop" => {
-            let ev = if val.get("fullyIdle").and_then(|v| v.as_bool()) == Some(true) { "session-end" } else { "stop" };
-            let _ = execute_hook(ev, mk(Vec::new(), None));
+        Some((ev, input)) => {
+            let _ = execute_hook(ev, input);
             println!(r#"{{"decision":"allow"}}"#);
         }
         // agy rejects any field in a PostToolUse reply: it expects `{}`
-        "PostToolUse" => println!("{{}}"),
-        _ => println!(r#"{{"decision":"allow"}}"#),
+        None if cli_event == "PostToolUse" => println!("{{}}"),
+        None => println!(r#"{{"decision":"allow"}}"#),
     }
 }

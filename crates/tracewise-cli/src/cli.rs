@@ -189,7 +189,14 @@ pub enum Commands {
         from: Option<String>,
         #[arg(long, help = "Record raw hook payload JSON into <dir>")]
         record: Option<PathBuf>,
+        #[arg(
+            long,
+            help = "Answer in a neutral JSON shape (api, event, decision, reason, context) instead of the agent's schema, for a program that nests this hook"
+        )]
+        neutral: bool,
     },
+    /// What a program that nests Tracewise needs to know: its API version and features
+    Companion,
     /// Agent adapters and configuration
     Agent {
         #[command(subcommand)]

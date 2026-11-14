@@ -1,15 +1,9 @@
 use super::{execute_hook, HookInput, HookOutput};
 use serde_json::Value;
 
-pub fn handle_claude_hook(agent: &str, cli_event: &str, stdin_str: &str) {
-    let val: Value = match serde_json::from_str(stdin_str) {
-        Ok(v) => v,
-        Err(_) => {
-            println!("{{}}");
-            return;
-        }
-    };
-
+/// What a Claude-style payload (Claude Code, Codex, Cursor, Gemini) stands for: the Tracewise event and its input, or `None` when the
+/// payload is not one of ours. Shared by the agent-schema replies below and by the neutral output (`hook --neutral`).
+pub(super) fn translate(agent: &str, cli_event: &str, val: &Value) -> Option<(&'static str, HookInput)> {
     let hook_event = val.get("hook_event_name").and_then(|v| v.as_str()).unwrap_or(cli_event);
     let session_id = val.get("session_id").and_then(|v| v.as_str()).unwrap_or("default");
     let cwd = val.get("cwd").and_then(|v| v.as_str()).map(|s| s.to_string());
@@ -20,7 +14,6 @@ pub fn handle_claude_hook(agent: &str, cli_event: &str, stdin_str: &str) {
         command,
         cwd: cwd.clone(),
     };
-    let allow = || HookOutput { decision: "allow", reason: None, notice: None };
     let tool_name = val.get("tool_name").and_then(|v| v.as_str()).unwrap_or("");
     let is_cmd = matches!(tool_name, "Bash" | "bash" | "run_terminal_cmd" | "run_shell_command" | "shell");
     let is_edit =
@@ -40,10 +33,33 @@ pub fn handle_claude_hook(agent: &str, cli_event: &str, stdin_str: &str) {
             direct
         }
     };
-
     match hook_event {
-        "PreToolUse" if is_cmd || is_edit => {
-            let (ev, input) = if is_cmd { ("pre-command", mk(Vec::new(), cmd_str())) } else { ("pre-edit", mk(edit_paths(), None)) };
+        "PreToolUse" if is_cmd => Some(("pre-command", mk(Vec::new(), cmd_str()))),
+        "PreToolUse" if is_edit => Some(("pre-edit", mk(edit_paths(), None))),
+        "PostToolUse" | "PostToolUseFailure" if is_cmd => Some(("post-command", mk(Vec::new(), cmd_str()))),
+        "PostToolUse" | "PostToolUseFailure" if is_edit => Some(("post-edit", mk(edit_paths(), None))),
+        "Stop" | "stop" => Some(("stop", mk(Vec::new(), None))),
+        "SessionEnd" | "session-end" => Some(("session-end", mk(Vec::new(), None))),
+        "UserPromptSubmit" | "prompt" => Some(("prompt", mk(Vec::new(), None))),
+        _ => None,
+    }
+}
+
+pub fn handle_claude_hook(agent: &str, cli_event: &str, stdin_str: &str) {
+    let val: Value = match serde_json::from_str(stdin_str) {
+        Ok(v) => v,
+        Err(_) => {
+            println!("{{}}");
+            return;
+        }
+    };
+    let allow = || HookOutput { decision: "allow", reason: None, notice: None };
+    let Some((ev, input)) = translate(agent, cli_event, &val) else {
+        println!("{{}}");
+        return;
+    };
+    match ev {
+        "pre-command" | "pre-edit" => {
             let res = execute_hook(ev, input).unwrap_or_else(|_| allow());
             if res.decision == "deny" {
                 let out = serde_json::json!({
@@ -61,25 +77,25 @@ pub fn handle_claude_hook(agent: &str, cli_event: &str, stdin_str: &str) {
                 println!("{{}}");
             }
         }
-        "PostToolUse" | "PostToolUseFailure" if is_cmd || is_edit => {
-            let (ev, input) = if is_cmd { ("post-command", mk(Vec::new(), cmd_str())) } else { ("post-edit", mk(edit_paths(), None)) };
+        "post-command" | "post-edit" => {
             let _ = execute_hook(ev, input);
             println!("{{}}");
         }
-        "Stop" | "stop" => {
-            let res = execute_hook("stop", mk(Vec::new(), None)).unwrap_or_else(|_| allow());
+        "stop" => {
+            let res = execute_hook("stop", input).unwrap_or_else(|_| allow());
             if res.decision == "deny" || res.decision == "block" {
                 println!("{}", serde_json::json!({"decision": "block", "reason": res.reason.unwrap_or_default()}));
             } else {
                 println!("{{}}");
             }
         }
-        "SessionEnd" | "session-end" => {
-            let _ = execute_hook("session-end", mk(Vec::new(), None));
+        "session-end" => {
+            let _ = execute_hook("session-end", input);
             println!("{{}}");
         }
-        "UserPromptSubmit" | "prompt" => {
-            let res = execute_hook("prompt", mk(Vec::new(), None)).unwrap_or_else(|_| allow());
+        _ => {
+            // prompt
+            let res = execute_hook("prompt", input).unwrap_or_else(|_| allow());
             if let Some(notice) = res.notice {
                 let out = serde_json::json!({
                     "hookSpecificOutput": {
@@ -96,7 +112,6 @@ pub fn handle_claude_hook(agent: &str, cli_event: &str, stdin_str: &str) {
                 println!("{{}}");
             }
         }
-        _ => println!("{{}}"),
     }
 }
 

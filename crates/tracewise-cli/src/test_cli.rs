@@ -104,13 +104,16 @@ fn test_cli_agent_parse() {
 fn test_cli_hook_from_parse() {
     let cli = Cli::parse_from(["tracewise", "hook", "pre-edit", "--from", "claude", "--record", "/tmp/rec"]);
     match cli.command {
-        Some(Commands::Hook { event, from, record }) => {
+        Some(Commands::Hook { event, from, record, neutral }) => {
             assert_eq!(event, "pre-edit");
             assert_eq!(from.as_deref(), Some("claude"));
             assert_eq!(record, Some(PathBuf::from("/tmp/rec")));
+            assert!(!neutral, "the neutral answer is opt-in");
         }
         _ => panic!("expected Commands::Hook"),
     }
+    let cli = Cli::parse_from(["tracewise", "hook", "--from", "codex", "--neutral"]);
+    assert!(matches!(cli.command, Some(Commands::Hook { neutral: true, .. })));
 }
 
 #[test]

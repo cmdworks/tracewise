@@ -18,6 +18,8 @@ Change ids are the 26-character ids shown by `log` (for example `01M6ZGHB9C46J2S
 
 | Command | |
 |---|---|
+| `tracewise hook <event> --from <agent> [--neutral]` | what an agent's hook runs; `--neutral` answers in an agent-independent shape for a program that nests Tracewise inside its own hook |
+| `tracewise companion [--json]` | the API version and features a nesting program checks before it uses Tracewise |
 | `tracewise agent install <name> [--scope project\|user]` | install hooks for `claude`, `codex`, `cursor`, `gemini`, `antigravity` or an adapter file |
 | `tracewise agent uninstall <name>` | remove them |
 | `tracewise agent status` | which agents are connected here |
