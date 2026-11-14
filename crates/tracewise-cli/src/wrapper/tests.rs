@@ -23,15 +23,32 @@ fn test_find_real_git_skips_tracewise_binaries() {
     assert_ne!(real, link2);
 }
 
+/// Builds the `tracewise` program and returns where cargo put it. Cargo is asked rather than the path guessed from the test's own: the layout of the
+/// target folder differs between cargo versions (Rust 1.100 moved test programs, which broke a guess made from `current_exe()`).
+fn built_tracewise() -> std::path::PathBuf {
+    let out = std::process::Command::new("cargo")
+        .args(["build", "--bin", "tracewise", "--message-format=json"])
+        .stderr(std::process::Stdio::inherit())
+        .output()
+        .expect("cargo build failed");
+    assert!(out.status.success(), "cargo build must succeed");
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
+        .filter(|v| {
+            v["reason"] == "compiler-artifact"
+                && v["target"]["name"] == "tracewise"
+                && v["target"]["kind"].as_array().is_some_and(|k| k.iter().any(|x| x == "bin"))
+        })
+        .filter_map(|v| v["executable"].as_str().map(std::path::PathBuf::from))
+        .next_back()
+        .expect("cargo reported the tracewise executable")
+}
+
 #[test]
 fn test_git_wrapper_multiple_wrappers_no_loop() {
     let _lock = crate::TEST_MUTEX.lock().unwrap();
-    let status = std::process::Command::new("cargo").args(["build", "--bin", "tracewise"]).status().expect("cargo build failed");
-    assert!(status.success(), "cargo build must succeed");
-
-    let test_exe = std::env::current_exe().expect("current exe");
-    let debug_dir = test_exe.parent().and_then(|p| p.parent()).expect("target dir");
-    let tracewise_bin = debug_dir.join("tracewise");
+    let tracewise_bin = built_tracewise();
     assert!(tracewise_bin.exists(), "tracewise binary exists at {:?}", tracewise_bin);
 
     let tmp = tempfile::tempdir().expect("tempdir");
