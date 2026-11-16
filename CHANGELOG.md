@@ -4,10 +4,15 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-16
+
 ### Added
 - **cli:** `tracewise hook --neutral`: the same hook answered as `{api, event, decision, reason, context}` instead of an agent's schema, for a program that nests Tracewise inside its own hook (AutoMemory)
 - **cli:** `tracewise companion [--json]`: the companion API version and features
 - **cli:** `lock list --json` also carries `agent`, `session` and `expires_in_s` (the record's own fields are unchanged)
+
+### Notes
+- A companion program (such as AutoMemory) can now run Tracewise inside its own hook and merge the answer; `tracewise companion --json` tells it the API number (1) it may rely on.
 
 ## [0.3.0] - 2026-11-10
 
