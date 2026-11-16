@@ -1,6 +1,6 @@
 [package]
 name = "ui"
-version = "0.3.0"
+version = "0.4.0"
 description = "Tracewise desktop app: a live timeline, file history and undo for the code changes Tracewise records"
 authors = ["Tracewise contributors"]
 license = "GPL-3.0-or-later"

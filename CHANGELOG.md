@@ -74,3 +74,4 @@ First public release, for macOS (Apple silicon and Intel). Builds are not notari
 [0.1.0]: https://github.com/cmdworks/tracewise/releases/tag/v0.1.0
 [0.2.0]: https://github.com/cmdworks/tracewise/releases/tag/v0.2.0
 [0.3.0]: https://github.com/cmdworks/tracewise/releases/tag/v0.3.0
+[0.4.0]: https://github.com/cmdworks/tracewise/releases/tag/v0.4.0
