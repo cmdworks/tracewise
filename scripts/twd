@@ -1,0 +1,58 @@
+#!/bin/sh
+# Development install: builds this checkout and links its dev programs (tracewise, tracewise-watchd, ...), the other names of
+# tracewise (`tw`, `trace`, `tracwise`) and the commands `twd` and `twdev` into $TWDEV_BIN (default ~/.local/bin), so the dev
+# `tracewise` works in any folder and terminal.
+# The links point into target/debug, so any later `cargo build` updates them; run `twd` again to rebuild and relink.
+#   twd              build and link (also works from any folder once linked)
+#   twd --uninstall  remove the links that point into this checkout
+# It stops instead of overwriting a file in that folder that is not one of its own links.
+set -eu
+src=$0
+while [ -L "$src" ]; do
+  l=$(readlink "$src")
+  case $l in /*) src=$l ;; *) src=$(dirname "$src")/$l ;; esac
+done
+root=$(cd "$(dirname "$src")/.." && pwd)
+bin=${TWDEV_BIN:-$HOME/.local/bin}
+
+ours() { [ -L "$1" ] && case $(readlink "$1") in "$root"/*) true ;; *) false ;; esac; }
+
+case ${1:-} in
+  -h | --help)
+    echo "twd: build this checkout and link its dev programs into $bin (tracewise, tw, trace, tracwise, twd, twdev)"
+    echo "  twd              build and link"
+    echo "  twd --uninstall  remove the links that point into this checkout"
+    exit 0
+    ;;
+  "" | --uninstall) ;;
+  *) echo "twd: unknown option $1 (try twd --help)" >&2; exit 2 ;;
+esac
+
+if [ "${1:-}" = "--uninstall" ]; then
+  for f in "$bin"/tracewise* "$bin/tw" "$bin/trace" "$bin/tracwise" "$bin/twd" "$bin/twdev"; do
+    if ours "$f"; then rm "$f" && echo "removed $f"; fi
+  done
+  exit 0
+fi
+
+if ! out=$(cargo build -q --manifest-path "$root/Cargo.toml" --workspace 2>&1); then printf '%s\n' "$out" >&2; exit 1; fi
+mkdir -p "$bin"
+n=0
+link() { # link <target> <name>
+  if { [ -e "$bin/$2" ] || [ -L "$bin/$2" ]; } && ! ours "$bin/$2"; then
+    echo "twd: $bin/$2 exists and is not one of ours; not overwriting (remove it first)" >&2; exit 1
+  fi
+  ln -sf "$1" "$bin/$2"; n=$((n + 1))
+}
+for f in "$root"/target/debug/tracewise*; do
+  case $f in *.*) continue ;; esac
+  [ -f "$f" ] && [ -x "$f" ] && link "$f" "$(basename "$f")"
+done
+for a in tw trace tracwise; do # another name of tracewise; skipped when the name already belongs to a different program
+  if { [ -e "$bin/$a" ] || [ -L "$bin/$a" ]; } && ! ours "$bin/$a"; then echo "twd: $bin/$a is not one of ours; skipped" >&2; continue; fi
+  ln -sf "$root/target/debug/tracewise" "$bin/$a"; n=$((n + 1))
+done
+link "$root/scripts/twd" twd
+link "$root/scripts/twdev" twdev
+echo "twd: linked $n commands in $bin (tracewise is now the dev build in every folder)"
+case ":$PATH:" in *":$bin:"*) ;; *) echo "note: $bin is not on your PATH" ;; esac

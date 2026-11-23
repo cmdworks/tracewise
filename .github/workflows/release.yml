@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    name: Tag is a new, higher version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare with the newest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[].tag_name' | sort -V | tail -1)
+          echo "this tag: $GITHUB_REF_NAME, newest release: ${latest:-none}"
+          [ -z "$latest" ] && exit 0
+          top=$(printf '%s\n%s\n' "$latest" "$GITHUB_REF_NAME" | sort -V | tail -1)
+          { [ "$top" = "$GITHUB_REF_NAME" ] && [ "$latest" != "$GITHUB_REF_NAME" ]; } || { echo "$GITHUB_REF_NAME is not higher than $latest"; exit 1; }
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: version
+    strategy:
+      matrix:
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Tag matches the version in Cargo.toml
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME != v$version"; exit 1; }
+      - run: cargo test --locked --workspace
+      - name: Package
+        run: scripts/package.sh ${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: |
+            target/dist/*.tar.gz
+            target/dist/*.tar.gz.sha256
+
+  desktop:
+    name: Desktop app ${{ matrix.target }}
+    needs: version
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            arch: arm64
+          - target: x86_64-apple-darwin
+            arch: x86_64
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.11.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Install dependencies
+        working-directory: ui
+        run: pnpm install --frozen-lockfile
+      - name: Build the disk image
+        working-directory: ui
+        run: pnpm tauri build --target ${{ matrix.target }} --bundles dmg
+      - name: Name and checksum the disk image
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          mkdir -p dmg
+          out="dmg/tracewise-desktop-$version-macos-${{ matrix.arch }}.dmg"
+          cp ui/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg "$out"
+          (cd dmg && shasum -a 256 "$(basename "$out")" > "$(basename "$out").sha256")
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.target }}
+          path: dmg/*
+
+  publish:
+    name: Publish
+    needs: [build, desktop]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Release notes from CHANGELOG.md
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          awk -v v="$version" '$0 ~ "^## \\[?"v"\\]?" {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
+          test -s notes.md || echo "Tracewise $GITHUB_REF_NAME" > notes.md
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          case "$GITHUB_REF_NAME" in v0.*|*-*) prerelease="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" dist/* --title "Tracewise $GITHUB_REF_NAME" --notes-file notes.md $prerelease

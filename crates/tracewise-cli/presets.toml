@@ -1,0 +1,23 @@
+# Capture presets: how much Tracewise watches live. `tracewise capture list` shows them, `tracewise capture use <name>` applies one.
+#
+# This file is data. To change a preset or add your own, put a file with the same format in ~/.tracewise/presets.toml: a preset with
+# the same name replaces the one here, others are added. Layers a preset does not mention are left as they are.
+#
+# Layers (the only two Tracewise can switch; agent hooks are installed per agent with `tracewise agent install`, and an editor
+# extension runs inside the editor, so both work with every preset):
+#   terminal  the command shims on PATH and the terminal hook in your shell startup files: wrapped commands and typed commands are recorded
+#             (the programs themselves stay on PATH with every preset, because agent hooks call `tracewise` by name)
+#   daemon    the background watcher that records changes from any program (also starts at login)
+# `capture.mode` follows the daemon layer by itself (daemon on = full, off = agents); it is never set separately here.
+
+[preset.agents]
+description = "Agents and editors only; nothing runs in the background and your shell is left alone. Your own edits are found by a quick scan."
+layers = { terminal = false, daemon = false }
+
+[preset.balanced]
+description = "Agents and your terminal: commands you type and git are recorded as they happen; nothing runs in the background."
+layers = { terminal = true, daemon = false }
+
+[preset.full]
+description = "Everything, with a background watcher that records changes made by any program."
+layers = { terminal = true, daemon = true }

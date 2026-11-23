@@ -1,0 +1,18 @@
+/target
+.DS_Store
+node_modules/
+ui/build/
+ui/.svelte-kit/
+ui/src-tauri/target/
+ui/src-tauri/gen/
+
+# the documentation site is built from docs/ plus a few root files (see site/sync.mjs)
+site/src/
+site/dist/
+site/.vitepress/cache/
+
+# demo video source (rendered output is in assets/)
+/brag-output/
+
+# the dev commands direnv puts on PATH (see .envrc)
+.devbin/
