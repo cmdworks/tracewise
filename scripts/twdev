@@ -1,0 +1,16 @@
+#!/bin/sh
+# Runs this checkout's dev build of tracewise on its own data (~/.tracewise-dev), never your real ~/.tracewise, to try things safely.
+# Linked as `twdev` by `twd`. TWDEV_NO_BUILD=1 skips the rebuild, TWDEV_HOME moves the data.
+src=$0
+while [ -L "$src" ]; do
+  l=$(readlink "$src")
+  case $l in /*) src=$l ;; *) src=$(dirname "$src")/$l ;; esac
+done
+root=$(cd "$(dirname "$src")/.." && pwd)
+# cargo's output is shown only when the build fails, so a warning does not repeat on every run
+if [ -z "${TWDEV_NO_BUILD:-}" ]; then
+  out=$(cargo build -q --manifest-path "$root/Cargo.toml" --workspace 2>&1) || { printf '%s\n' "$out" >&2; exit 1; }
+fi
+export TRACEWISE_HOME="${TWDEV_HOME:-$HOME/.tracewise-dev}"
+# exec the binary in target/debug: tracewise finds tracewise-watchd next to itself
+exec "$root/target/debug/tracewise" "$@"

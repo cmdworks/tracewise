@@ -1,0 +1,18 @@
+[package]
+name = "tracewise-platform"
+version = "0.0.1-beta"
+edition = "2021"
+description = "Operating-system abstraction layer for Tracewise"
+license = "GPL-3.0-or-later"
+authors = ["Asmat"]
+
+[features]
+default = []
+platform-stub = []
+
+[dependencies]
+libc = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

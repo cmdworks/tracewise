@@ -1,0 +1,17 @@
+[package]
+name = "tracewise-zed"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+description = "The Zed extension that starts `tracewise lsp`"
+publish = false
+
+# not part of the repository's cargo workspace: it is built for WebAssembly by Zed
+[workspace]
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+zed_extension_api = "0.7.0"

@@ -1,0 +1,57 @@
+name: VS Code extension
+
+on:
+  push:
+    branches: [main]
+    paths: ["editors/vscode/**", "docs/json.md", "crates/tracewise-cli/**", "crates/tracewise-core/**", ".github/workflows/vscode.yml"]
+  pull_request:
+    paths: ["editors/vscode/**", "docs/json.md", "crates/tracewise-cli/**", "crates/tracewise-core/**", ".github/workflows/vscode.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vscode-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  extension:
+    name: Extension (macOS)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: editors/vscode
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.11.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # runs the TypeScript tests without a build step
+          cache: pnpm
+          cache-dependency-path: editors/vscode/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Type-check, test, build
+        run: pnpm check
+      - name: Build the CLI the fixtures come from
+        run: cargo build --locked -p tracewise
+        working-directory: .
+      - name: The recorded fixtures still have the shape the CLI answers with
+        run: node scripts/shape-check.mjs
+        env:
+          TRACEWISE_BIN: ${{ github.workspace }}/target/debug/tracewise
+      - name: Package
+        run: pnpm package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tracewise-vscode
+          path: editors/vscode/*.vsix

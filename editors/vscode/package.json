@@ -1,0 +1,100 @@
+{
+  "name": "tracewise",
+  "displayName": "Tracewise",
+  "description": "Who changed each line, and why: the history Tracewise records for you, your tools and your coding agents.",
+  "version": "0.1.0",
+  "publisher": "cmdworks",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cmdworks/tracewise.git",
+    "directory": "editors/vscode"
+  },
+  "homepage": "https://cmdworks.github.io/tracewise/",
+  "type": "module",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other",
+    "SCM Providers"
+  ],
+  "keywords": [
+    "history",
+    "blame",
+    "agents",
+    "ai",
+    "undo"
+  ],
+  "main": "./dist/extension.cjs",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Tracewise runs a program on your machine, and through it git, which reads a folder's own settings. In a folder you have not trusted the extension does nothing."
+    }
+  },
+  "contributes": {
+    "configuration": {
+      "title": "Tracewise",
+      "properties": {
+        "tracewise.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "Path to the `tracewise` program. Empty means the one on your `PATH`."
+        },
+        "tracewise.recordSaves": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Tell Tracewise when you save a file, so your own edits are recorded as yours without a background watcher."
+        },
+        "tracewise.askWhySave": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "After each save that changed something, ask why (Esc skips). The answer is stored as the reason of that change."
+        },
+        "tracewise.blame.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show who changed each line, and why, at the end of the line."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "tracewise.showChange",
+        "title": "Tracewise: Show the change for this line"
+      },
+      {
+        "command": "tracewise.undoChange",
+        "title": "Tracewise: Undo the change for this line"
+      },
+      {
+        "command": "tracewise.refresh",
+        "title": "Tracewise: Refresh"
+      },
+      {
+        "command": "tracewise.showPending",
+        "title": "Tracewise: Show changes without a reason"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test src/test/",
+    "fixtures": "sh scripts/refresh-fixtures.sh",
+    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.6.0"
+  }
+}

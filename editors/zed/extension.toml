@@ -1,0 +1,15 @@
+id = "tracewise"
+name = "Tracewise"
+description = "Who changed each line, and why: hover a line to see the history Tracewise recorded, and your saves are recorded too."
+version = "0.1.0"
+schema_version = 1
+authors = ["cmdworks"]
+repository = "https://github.com/cmdworks/tracewise"
+
+[language_servers.tracewise]
+name = "Tracewise"
+languages = [
+  "Rust", "Python", "JavaScript", "TypeScript", "TSX", "Go", "C", "C++", "Java", "Kotlin", "Swift", "Ruby", "PHP", "Zig",
+  "Elixir", "Lua", "Dart", "Svelte", "HTML", "CSS", "SCSS", "JSON", "JSONC", "YAML", "TOML", "Markdown", "Shell Script",
+  "SQL", "Dockerfile", "Plain Text",
+]
